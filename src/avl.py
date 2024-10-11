@@ -7,8 +7,6 @@ class Node:
         self.height = 1
         self.right = None
         self.left = None
-        self.offset = offset
-        self.segment = segment
 
 class AVL:
     def __init__(self):
