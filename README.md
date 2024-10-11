@@ -5,7 +5,7 @@ This is a Python implementation of an LSM-tree database using AVL trees for both
 - [x]  **AVL Tree Implementation:**
    - Implement a balanced AVL tree data structure for efficient key-value storage and retrieval.
 
-- [ ]  **Bloom Filter Implementation:**
+- [x]  **Bloom Filter Implementation:**
    - Implement a Bloom filter to quickly check if a key might be present in an SSTable before performing a full search.
 
 - [ ]  **LSMTree:**
