@@ -1,7 +1,7 @@
 #### AVL tree implementation, it will house offset of that segment along with the segment id, so that its easier while doing a memflush.
 
 class Node:
-    def __init__(self, key, value, offset, segment):
+    def __init__(self, key, value):
         self.key = key
         self.value = value
         self.height = 1
@@ -62,9 +62,9 @@ class AVL:
         node.bf = 1 + max(self.get_height(node.left), self.get_height(node.right))
         node.left.bf = 1 +  max(self.get_height(node.left.left), self.get_height(node.left.right))
 
-    def insert(self, root, key):
+    def insert(self, root, key, value):
         if root is None:
-            return Node(key)
+            return Node(key, value)
         if key < root.key:
             root.left = self.insert(root.left, key)
         else:
