@@ -15,16 +15,16 @@ class BloomFilter():
         return int(size), int(num_funs)
     
     def _hash(self, key, seed):
-        return hash(key, seed) % self.size
+        return hash(str(key), seed) % self.size
     
     def add(self, key):
         for seed in self.seed:
-            idx = self._hash(key, seed)
+            idx = self._hash(str(key), seed)
             self.bit_array[idx] = True
         
     def __contains__(self, key):
         for seed in self.seed:
-            idx = self._hash(key, seed)
+            idx = self._hash(str(key), seed)
             if not self.bit_array[idx]:
                 return False
         return True
