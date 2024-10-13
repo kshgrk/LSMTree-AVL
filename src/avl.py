@@ -1,5 +1,6 @@
 #### AVL tree implementation, it will house offset of that segment along with the segment id, so that its easier while doing a memflush.
 from .bloom_filter import BloomFilter
+from sys import getsizeof
 
 class Node:
     def __init__(self, key, value):
@@ -14,6 +15,7 @@ class AVL:
         self.root = None
         self.bloom_filter = BloomFilter()
         self.items = 0
+        self.size = 0
 
     def get_height(self, node):
         if not node:
@@ -67,6 +69,7 @@ class AVL:
         self.root = self._insert(self.root, key, value) 
         if self.bloom_filter: 
             self.bloom_filter.add(key)
+        self.size += getsizeof(key)+getsizeof(value)
 
     def _insert(self, root, key, value): 
 
@@ -122,17 +125,23 @@ class AVL:
             # Sub-case 1: root.left is NIL
             # Will return None if root has no children.
             if root.left is None:
+                tmp_val = root.value
                 tmp = root.right
                 root = None
                 self.items -= 1
-                return tmp
+                self.size -= getsizeof(key)
+                self.size -= getsizeof(tmp_val)
+                return tmp 
             
             # Sub-case 2: root.right is NIL
             # Will return None if root has no children.
             elif root.right is None:
+                tmp_val = root.value
                 tmp = root.left
                 root = None
                 self.items -= 1
+                self.size -= getsizeof(key)
+                self.size -= getsizeof(tmp_val)
                 return tmp
             
             # Sub-case 3: Both childern are present.
@@ -144,8 +153,11 @@ class AVL:
                 tmp = tmp.right
             
             root.key = tmp2.key
+            tmp_val = root.val
             root.left = self._delete(root.left, tmp2.key)
             self.items -= 1
+            self.size -= getsizeof(key)
+            self.size -= getsizeof(tmp_val)
         
         root.height = 1 + max(self.get_height(root.left), self.get_height(root.right))
 
