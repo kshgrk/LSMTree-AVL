@@ -13,44 +13,84 @@ class LSM():
         self.sstables_dir = os.path.join(self.lsm_dir, 'sstables/')
         self.index_path = os.path.join(self.lsm_dir, 'index.bin')
         self.wal_path = os.path.join(self.lsm_dir, 'wal.log')
+        self.metadata_path = os.path.join(self.lsm_dir, 'metadata.bin')
+        self.all_segments = []
         self.memtable = AVL()
         self.index = AVL()
-        self.wal = WAL()
-        self.sparsity = 100 #May make this and false_pos_prob mutable in future.
-        self.metadata_path = os.path.join(self.lsm_dir, 'metadata.bin')
+        self.wal = WAL(wal_file=self.wal_path)
+        self.segment_count = 0
 
         if not (Path(lsm_dir).exists() and Path(lsm_dir).is_dir()):
             Path(lsm_dir).mkdir()
             Path(self.sstables_dir).mkdir()
         
         self.load_metadata() 
+    
+    def insert(self, key, value):
+        #Write to wal first
+        if self.wal.append('PUT', key, value):
+            self.memtable.insert(key, value)
+
+            if self.memtable.items >= 10000 or self.memtable.size >= 1000000:
+                print('Memtable full, flushing to disk.')
+                filename = os.path.join(self.lsm_dir, 'rawMemtable.bin')
+                self.flush_tree(self.memtable, filename)
+                self.wal.truncate()
+                # Initiate compaction on separate thread for uninteruppted read and writes in db.
+                ### TODO
+                # Insert min key value in index
+                ### TODO
+    
+    def search(self, key):
+        if key in self.memtable.bloom_filter:
+            node = self.memtable.search(key)
+            if node:
+                return node.value #checking false positive
+        else:
+            for segment in self.all_segments.sort(reverse=True):
+                segment_path = os.path.join(self.sstables_dir, segment)
+                blm_fltr = self.load_segment_bloom_fiter(segment_path)
+                if key in blm_fltr:
+                    segment_data = self.load_tree(segment_path)
+                    node = segment_data.search(key)
+                    if node:
+                        return node.value #checking false positive
+        return f'{key} doesn\'t exist in db.'
 
     def load_metadata(self):
-        with open(self.metadata_path) as f:
-            compressed_data = f.read()
-        decompressed_data = zlib.decompress(compressed_data)
-        unpacked_data = msgpack.unpackb(decompressed_data)
-        self.segment_count = unpacked_data['segment_count']
-        self.sparsity = unpacked_data['sparsity']
+        if os.path.exists(self.metadata_path):
+            with open(self.metadata_path) as f:
+                compressed_data = f.read()
+            decompressed_data = zlib.decompress(compressed_data)
+            unpacked_data = msgpack.unpackb(decompressed_data)
+            self.segment_count = unpacked_data['segment_count']
+            self.all_segments = unpacked_data['all_segments']
 
-        # Loading index
-        self.index = self.load_tree(self.index_path)
+            # Loading index
+            self.index = self.load_tree(self.index_path)
 
-        # Loading current segment into memtable
-        current_segment_path = os.path.join(self.sstables_dir, f'segment_{self.segment_count}.bin') 
-        self.memtable = self.load_tree(current_segment_path)
+            # Loading current segment into memtable
+            current_segment_path = os.path.join(self.sstables_dir, f'segment_{self.segment_count}.bin') 
+            self.memtable = self.load_tree(current_segment_path)
+            print('Existing instance found!!\nData successfully loaded.')
+            return
+        print('No existing instance found.\nNew instance created.')        
+        return
 
     def unpacking_data_bin(self, filename):
-        with open(filename, 'rb') as f:
-            compressed_data = f.read()
-        decompressed_data = zlib.decompress(compressed_data)
-        unpacked_data = msgpack.unpackb(decompressed_data)
-        return unpacked_data
+        if os.path.exists(filename):
+            with open(filename, 'rb') as f:
+                compressed_data = f.read()
+            decompressed_data = zlib.decompress(compressed_data)
+            unpacked_data = msgpack.unpackb(decompressed_data)
+            return unpacked_data
+        print(f'Error!!\n{filename} doesn\'t exist')
+        return None
     
     def save_metadata(self):
         metadata = {
             'segment_count': self.segment_count,
-            'sparsity': self.sparsity
+            'all_segments': self.all_segments,
         }
         # Saving index in index.bin
         self.flush_tree(self.index, self.index_path)
@@ -121,7 +161,7 @@ class LSM():
         for key, value in node_list:
             segment_data.root = segment_data.insert(segment_data.root, key, value)
         
-        # Checking if num_items are same or not
+        # Checking if unpacked correctly or not
         if segment_data.items == unpacked_data['segment_items'] and segment_data.size == unpacked_data['segment_size']:
             print('Items count and size match!!')
         
