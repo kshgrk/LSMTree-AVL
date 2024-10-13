@@ -6,7 +6,7 @@ class WAL:
         self.wal_file = wal_file
     
     def append(self, operation, key, value=None):
-        record = (operation, key)
+        record = (operation, key, value)
 
         try:
             with open(self.wal_file, 'ab') as wal_file:
